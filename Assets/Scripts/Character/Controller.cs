@@ -31,14 +31,16 @@ public class Controller : MonoBehaviour {
     [Range(0, 20)] public int maxHealth; // The maximum health of this character.
     [Range(0, 20)] public float baseSpeed; // The base speed at which this character moves.
     [Range(0, 100)] public float baseAcceleration; // The base acceleration at which this character moves.
-    [Range(0, 20)] public float baseWeight; // The base weight that the character has.
-    [Range(0, 20)] public float baseJump; // The base weight that the character has.
+    [Range(0, 100)] public float baseWeight; // The base weight that the character has.
+    [Range(0.05f, 1f)] public float floatiness; // The character's floating weight
+    [Range(0, 100)] public float baseJump; // The base weight that the character has.
 
     /* --- Internal Variables --- */
     [Space(5)][Header("Internal")]
     [SerializeField] protected int health; // The character's health.
     [SerializeField] protected float moveSpeed; // The character's movement speed.
     [SerializeField] protected float moveDirection; // The direction the character is moving.
+    [SerializeField] protected float weight; // The character's movement speed.
 
     /* --- Flags --- */
     [Space(5)][Header("Flags")]
@@ -48,13 +50,12 @@ public class Controller : MonoBehaviour {
     /* --- Unity --- */
     void Awake() {
         body = GetComponent<Rigidbody2D>();
-        body.gravityScale = baseWeight * GameRules.GravityScale;
         body.constraints = RigidbodyConstraints2D.FreezeRotation;
     }
 
     void Update() {
-        Think();
         Check();
+        Think();
     }
 
     void FixedUpdate() {
@@ -71,6 +72,8 @@ public class Controller : MonoBehaviour {
         if (moveDirection != 0 && moveSpeed != 0) {
             movementFlag = Movement.Moving;
         }
+
+        body.gravityScale = weight * GameRules.GravityScale;
         airborneFlag = Airborne.Grounded;
         if (mesh.feetbox.IsEmpty()) {
             airborneFlag = Airborne.Rising;

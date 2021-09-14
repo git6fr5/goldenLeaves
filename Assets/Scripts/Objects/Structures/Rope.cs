@@ -3,147 +3,110 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(LineRenderer))]
+[RequireComponent(typeof(EdgeCollider2D))]
 public class Rope : Structure {
 
     /* --- Components --- */
-    LineRenderer lineRenderer;
+    protected LineRenderer lineRenderer;
+    protected EdgeCollider2D edgeCollider;
 
-    public int segmentCount;
-    public float lineWidth;
-    [SerializeField] protected Vector3[] ropeSegments;
-    [SerializeField] protected Vector3[] prevRopeSegments;
+    /* --- Static Variables --- */
+    [SerializeField] protected static float SegmentLength  = 0.2f;
+    [SerializeField] protected static float SegmentWeight = 1.5f;
+    [SerializeField] protected static int ConstraintDepth = 50;
 
-    private float dist = 0.2f;
+    /* --- Variables --- */
+    [HideInInspector] protected int segmentCount; // The number of segments.
+    [SerializeField] public Transform startpoint; // The width of the rope.
+    [SerializeField] public float ropeLength; // The width of the rope.
+    [SerializeField] public float ropeWidth; // The width of the rope.
+    [SerializeField] protected Vector3[] ropeSegments; // The current positions of the segments.
+    [SerializeField] protected Vector3[] prevRopeSegments; // The previous positions of the segments.
 
-    void OnTriggerStay2D(Collider2D collider) {
-        if (collider.transform.parent.GetComponent<Rigidbody2D>() != null) {
-            Rigidbody2D body = collider.transform.parent.GetComponent<Rigidbody2D>();
-            // get closest segment
-            Vector3 pos = collider.transform.position;
-            int index = 1;
-            float minDist = 1e9f;
-            for (int i = 1; i < segmentCount; i++) {
-                if ((pos - ropeSegments[i]).magnitude < minDist) {
-                    index = i;
-                    minDist = (pos - ropeSegments[i]).magnitude;
-                }
-            }
-            ropeSegments[index] += (Vector3)body.velocity * Time.deltaTime;
-        }
-    }
-
+    /* --- Unity --- */
+    // Runs once on initialization.
     void Awake() {
-        SetRope();
+        // Cache these references.
         lineRenderer = GetComponent<LineRenderer>();
+        edgeCollider = GetComponent<EdgeCollider2D>();
+        // Set up these components.
+        edgeCollider.edgeRadius = ropeWidth / 2f;
+        RopeSegments();
     }
 
+    // Runs once every frame.
     void Update() {
-        DrawRope();
+        Render();
     }
 
+    // Runs once every set time interval.
     void FixedUpdate() {
         Simulation();
     }
 
-    EdgeCollider2D collisionFrame;
-
-    void SetRope() {
-        ropeSegments = new Vector3[segmentCount];
-        ropeSegments[0] = Vector3.zero;
-        for (int i = 1; i < segmentCount; i++) {
-            ropeSegments[i] = ropeSegments[i - 1] + new Vector3(1, -1, 0);
-            float newDist = Vector3.Distance(ropeSegments[i], ropeSegments[i - 1]);
-            Vector3 newNorm = (ropeSegments[i] - ropeSegments[i - 1]).normalized;
-            ropeSegments[i] = ropeSegments[i - 1] + newNorm * dist;
+    // Runs if this trigger is activated.
+    void OnTriggerStay2D(Collider2D collider) {
+        if (collider.transform.parent.GetComponent<Rigidbody2D>() != null) {
+            Jiggle(collider);
         }
-        prevRopeSegments = new Vector3[segmentCount];
-        for (int i = 0; i < segmentCount; i++) {
-            prevRopeSegments[i] = ropeSegments[i];
-        }
-        collisionFrame = GetComponent<EdgeCollider2D>();
-        collisionFrame.edgeRadius = lineWidth / 2f;
     }
 
-    void DrawRope() {
-        lineRenderer.startWidth = lineWidth;
-        lineRenderer.endWidth = lineWidth;
+    /* --- Methods --- */
+    // Initalizes the rope segments.
+    void RopeSegments() {
+        // Get the number of segments for a rope of this length.
+        segmentCount = (int)Mathf.Ceil(ropeLength / SegmentLength);
+
+        // Initialize the rope segments.
+        ropeSegments = new Vector3[segmentCount];
+        prevRopeSegments = new Vector3[segmentCount];
+        
+        for (int i = 0; i < segmentCount; i++) {
+            ropeSegments[i] = startpoint.position;
+            prevRopeSegments[i] = ropeSegments[i];
+        }
+        ropeSegments[segmentCount - 1] += ropeLength * Vector3.right;
+    }
+
+    // Renders the rope using the line renderer and edge collider.
+    void Render() {
+        lineRenderer.startWidth = ropeWidth;
+        lineRenderer.endWidth = ropeWidth;
         lineRenderer.positionCount = segmentCount;
         lineRenderer.SetPositions(ropeSegments);
 
         Vector2[] points = new Vector2[segmentCount];
         for (int i = 0; i < segmentCount; i++) {
-            points[i] = (Vector2)ropeSegments[i];
+            points[i] = (Vector2)ropeSegments[i] - (Vector2)transform.position;
         }
 
-        collisionFrame.points = points;
+        edgeCollider.points = points;
     }
 
-    public float swingDirection = 1f;
-    private float timeInterval = 1.5f;
-    public float swingTime = 3f;
-
-    void _Swing() {
-        timeInterval += Time.fixedDeltaTime;
-        if (timeInterval >= swingTime) {
-            timeInterval = 0f;
-            swingDirection *= -1f;
-        }
-
-        //float force = 50f;
-        //float distForce = force * dist;
-        //for (int i = segmentCount - 1; i >= 1; i--) {
-        //    // move
-        //    Vector3 norm = (ropeSegments[i] - ropeSegments[i - 1]).normalized;
-        //    Vector3 rotated = new Vector3(-norm.y, norm.x, 0);
-
-        //    // makes a cool spiral pattern.
-        //    //ropeSegments[i] = ropeSegments[i] + rotated * swingDirection * Time.fixedDeltaTime * i;
-        //    //Vector3 newNorm = (ropeSegments[i] - ropeSegments[i - 1]).normalized;
-        //    //ropeSegments[i] = ropeSegments[i - 1] + newNorm * dist;
-
-        //    // makes a cool box pattern. // fun values are force = 100f
-        //    ropeSegments[i] = ropeSegments[i] + rotated * swingDirection * Time.fixedDeltaTime * distForce;
-        //    float newDist = Vector3.Distance(ropeSegments[i], ropeSegments[i - 1]);
-        //    Vector3 newNorm = (ropeSegments[i] - ropeSegments[i - 1]).normalized;
-        //    ropeSegments[i] = ropeSegments[i - 1] + newNorm * dist;
-        //    distForce = Mathf.Max(0, newDist - dist) * force;
-
-        //}
-
-    }
-
-    void Simulation() {
-
-        Vector3 forceGravity = new Vector3(0f, -1.5f, 0f);
-
+    // Adds a jiggle whenever a body collides with this.
+    void Jiggle(Collider2D collider) {
+        Rigidbody2D body = collider.transform.parent.GetComponent<Rigidbody2D>();
+        // Get the segment closest to the collider.
+        Vector3 pos = collider.transform.position;
+        int index = 1;
+        float minDist = 1e9f;
         for (int i = 1; i < segmentCount; i++) {
-            Vector3 velocity = ropeSegments[i] - prevRopeSegments[i];
-            prevRopeSegments[i] = ropeSegments[i];
-            ropeSegments[i] += velocity;
-            ropeSegments[i] += forceGravity * Time.fixedDeltaTime;
-        }
-
-        for (int i = 0; i < 50; i++) {
-            Constraints();
-        }
-
-    }
-
-    void Constraints() {
-
-        for (int i = 1; i < segmentCount; i++) {
-
-            float newDist = (ropeSegments[i-1] - ropeSegments[i]).magnitude;
-            Vector3 changeDir = (ropeSegments[i - 1] - ropeSegments[i]).normalized;
-
-            float error = newDist - dist;
-            Vector3 changeAmount = changeDir * error;
-
-            if (i != 1) {
-                ropeSegments[i - 1] -= changeAmount * 0.5f;
+            if ((pos - ropeSegments[i]).magnitude < minDist) {
+                index = i;
+                minDist = (pos - ropeSegments[i]).magnitude;
             }
-            ropeSegments[i] += changeAmount * 0.5f;
         }
+        // Add a jiggle to this segment.
+        ropeSegments[index] += (Vector3)body.velocity * SegmentWeight * Time.deltaTime; // body.gravityScale /  
+    }
+
+    // Simulates the rope physics.
+    protected virtual void Simulation() {
+
+    }
+
+    protected virtual void Constraints() {
+        //
     }
 
 }
