@@ -2,14 +2,19 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class HangingRope : Rope {
+public class BridgeRope : Rope {
+
+    [SerializeField] protected Transform endpoint;
 
     void Start() {
-        edgeCollider.isTrigger = true;
+        edgeCollider.isTrigger = false;
     }
 
     protected override void Constraints() {
+
         ropeSegments[0] = startpoint.position;
+        ropeSegments[segmentCount-1] = endpoint.position;
+
         for (int i = 1; i < segmentCount; i++) {
             // Get the distance and direction between the segments.
             float newDist = (ropeSegments[i - 1] - ropeSegments[i]).magnitude;
@@ -26,5 +31,4 @@ public class HangingRope : Rope {
             ropeSegments[i] += errorVector * 0.5f;
         }
     }
-
 }

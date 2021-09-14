@@ -51,6 +51,13 @@ public class Rope : Structure {
         }
     }
 
+    // Runs if this trigger is activated.
+    void OnCollisionStay2D(Collision2D collision) {
+        if (collision.collider.transform.parent.GetComponent<Rigidbody2D>() != null) {
+            Jiggle(collision.collider);
+        }
+    }
+
     /* --- Methods --- */
     // Initalizes the rope segments.
     void RopeSegments() {
@@ -100,9 +107,17 @@ public class Rope : Structure {
         ropeSegments[index] += (Vector3)body.velocity * SegmentWeight * Time.deltaTime; // body.gravityScale /  
     }
 
-    // Simulates the rope physics.
-    protected virtual void Simulation() {
-
+    void Simulation() {
+        Vector3 forceGravity = new Vector3(0f, -SegmentWeight * GameRules.GravityScale, 0f);
+        for (int i = 0; i < segmentCount; i++) {
+            Vector3 velocity = ropeSegments[i] - prevRopeSegments[i];
+            prevRopeSegments[i] = ropeSegments[i];
+            ropeSegments[i] += velocity;
+            ropeSegments[i] += forceGravity * Time.fixedDeltaTime;
+        }
+        for (int i = 0; i < ConstraintDepth; i++) {
+            Constraints();
+        }
     }
 
     protected virtual void Constraints() {
